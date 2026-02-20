@@ -1,8 +1,30 @@
 const User = require('../models/User');
 
+// @desc    Get all users (any logged-in user)
+// @route   GET /api/users
+// @access  Private
+exports.getAllUsers = async (req, res) => {
+  try {
+    // Fetch all users, exclude password field
+    const users = await User.find().select('-password').sort('-createdAt');
+    
+    res.json({
+      success: true,
+      count: users.length,
+      data: users
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
 // @desc    Update applicant profile (add additional data)
 // @route   PUT /api/users/profile
-// @access  Private (Applicant only)
+// @access  Private
 exports.updateProfile = async (req, res) => {
   try {
     const { faydaId, phone, address, documents, department } = req.body;
@@ -37,7 +59,7 @@ exports.updateProfile = async (req, res) => {
 
 // @desc    Get applicant profile
 // @route   GET /api/users/profile
-// @access  Private (Applicant only)
+// @access  Private
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -56,7 +78,7 @@ exports.getProfile = async (req, res) => {
 
 // @desc    Upload document (simplified - just store URL/reference)
 // @route   POST /api/users/documents
-// @access  Private (Applicant only)
+// @access  Private
 exports.uploadDocument = async (req, res) => {
   try {
     const { documentUrl, documentType } = req.body;

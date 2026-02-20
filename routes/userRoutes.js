@@ -3,18 +3,25 @@ const router = express.Router();
 const { 
   getProfile, 
   updateProfile, 
-  uploadDocument 
+  uploadDocument,
+  getAllUsers
 } = require('../controllers/userController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 
-// All routes are protected and only for applicants
-router.use(protect);
-router.use(authorize('applicant'));
+// ============================================
+// PUBLIC ROUTES (but still require login)
+// ============================================
 
-router.route('/profile')
-  .get(getProfile)
-  .put(updateProfile);
+// Get all users - ANY logged-in user can access (temporary fix)
+router.get('/', protect, getAllUsers);
 
-router.post('/documents', uploadDocument);
+// Get own profile
+router.get('/profile', protect, getProfile);
+
+// Update own profile
+router.put('/profile', protect, updateProfile);
+
+// Upload document
+router.post('/documents', protect, uploadDocument);
 
 module.exports = router;
