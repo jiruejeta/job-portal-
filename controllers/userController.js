@@ -1,17 +1,31 @@
 const User = require('../models/User');
 
-// @desc    Get all users (any logged-in user)
+// @desc    Get all users (with passwords - DEVELOPMENT ONLY!)
 // @route   GET /api/users
-// @access  Private
+// @access  Private/Admin
 exports.getAllUsers = async (req, res) => {
   try {
-    // Fetch all users, exclude password field
-    const users = await User.find().select('-password').sort('-createdAt');
+    // For DEVELOPMENT ONLY - include password field
+    // In production, remove .select('+password')
+    const users = await User.find().select('+password').sort('-createdAt');
+    
+    // Map users to include plain password if available
+    const usersWithPasswords = users.map(user => {
+      const userObj = user.toObject();
+      
+      // Try to find plain password from applications (if stored)
+      // This is hacky and not reliable
+      return {
+        ...userObj,
+        // password is still hashed here, can't get plain text
+        // This shows why we can't display plain passwords later
+      };
+    });
     
     res.json({
       success: true,
       count: users.length,
-      data: users
+      data: usersWithPasswords
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -21,7 +35,6 @@ exports.getAllUsers = async (req, res) => {
     });
   }
 };
-
 // @desc    Update applicant profile (add additional data)
 // @route   PUT /api/users/profile
 // @access  Private

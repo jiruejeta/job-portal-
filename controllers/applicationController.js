@@ -161,15 +161,15 @@ exports.approveApplication = async (req, res) => {
     }
 
     // GENERATE CREDENTIALS
-    // Generate username and password
+    const { generateUsername, generatePassword, hashPassword } = require('../utils/generateCredentials');
+    
     let plainUsername = generateUsername(application.applicantName);
     const plainPassword = generatePassword(application.applicantName);
     const hashedPassword = await hashPassword(plainPassword);
 
-    // Check if username already exists (rare but possible)
+    // Check if username already exists
     const existingUser = await User.findOne({ username: plainUsername });
     if (existingUser) {
-      // Add another random number if username exists
       plainUsername = `${plainUsername}${Math.floor(10 + Math.random() * 90)}`;
     }
 
@@ -185,16 +185,16 @@ exports.approveApplication = async (req, res) => {
       email: application.email
     });
 
-    // Update application with generated credentials
+    // Update application
     application.status = 'approved';
     application.generatedUsername = plainUsername;
-    application.generatedPassword = plainPassword; // Store plain password temporarily
+    application.generatedPassword = plainPassword;
     await application.save();
 
-    // Return success with credentials
+    // Return success WITH plain password (DEVELOPMENT ONLY!)
     res.json({
       success: true,
-      message: 'Application approved successfully. User account created.',
+      message: 'Application approved successfully.',
       data: {
         application: {
           id: application._id,
@@ -204,11 +204,11 @@ exports.approveApplication = async (req, res) => {
           id: user._id,
           name: user.name,
           username: user.username,
-          password: plainPassword, // SEND ONLY ONCE!
+          password: plainPassword, // ⚠️ Plain text password - DEVELOPMENT ONLY!
           email: user.email,
           role: user.role
         },
-        notice: '⚠️ Please save these credentials. They will not be shown again.'
+        warning: 'This password is shown only once. Save it now!'
       }
     });
 
