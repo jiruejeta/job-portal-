@@ -2,7 +2,8 @@ const Application = require('../models/Application');
 const Job = require('../models/Job');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
-
+const Employee = require('../models/Employee');
+const QRCode = require('qrcode');
 // Import credential generator
 const { generateUsername, generatePassword, hashPassword } = require('../utils/generateCredentials');
 
@@ -141,6 +142,8 @@ exports.getPendingApplications = async (req, res) => {
 
 // @desc    Approve application and generate credentials
 // @route   PUT /api/applications/:id/approve
+// @desc    Approve application and generate credentials + employee ID
+// @route   PUT /api/applications/:id/approve
 // @access  Private (Admin)
 exports.approveApplication = async (req, res) => {
   try {
@@ -185,16 +188,51 @@ exports.approveApplication = async (req, res) => {
       email: application.email
     });
 
+    // ===== NEW: GENERATE EMPLOYEE ID AND QR CODE =====
+    
+    // Generate unique employee ID
+    const employeeId = await Employee.generateEmployeeId();
+    
+    // Create data for QR code
+    const qrData = JSON.stringify({
+      id: employeeId,
+      name: application.applicantName,
+      job: application.jobId.title,
+      dept: application.jobId.department,
+      date: new Date().toISOString().split('T')[0]
+    });
+    
+    // Generate QR code as data URL
+    const qrCodeDataURL = await QRCode.toDataURL(qrData);
+
+    // Create employee record
+    const employee = await Employee.create({
+      userId: user._id,
+      applicationId: application._id,
+      jobId: application.jobId._id,
+      employeeId: employeeId,
+      fullName: application.applicantName,
+      email: application.email,
+      phone: application.phone,
+      jobTitle: application.jobId.title,
+      department: application.jobId.department,
+      salary: application.jobId.salary || 'Not specified',
+      location: application.jobId.location || 'Not specified',
+      jobType: application.jobId.jobType || 'Full-time',
+      qrCode: qrCodeDataURL,
+      qrCodeGeneratedAt: new Date()
+    });
+
     // Update application
     application.status = 'approved';
     application.generatedUsername = plainUsername;
     application.generatedPassword = plainPassword;
     await application.save();
 
-    // Return success WITH plain password (DEVELOPMENT ONLY!)
+    // Return success with credentials AND employee info
     res.json({
       success: true,
-      message: 'Application approved successfully.',
+      message: 'Application approved successfully. Employee ID generated.',
       data: {
         application: {
           id: application._id,
@@ -204,11 +242,15 @@ exports.approveApplication = async (req, res) => {
           id: user._id,
           name: user.name,
           username: user.username,
-          password: plainPassword, // ⚠️ Plain text password - DEVELOPMENT ONLY!
+          password: plainPassword,
           email: user.email,
           role: user.role
         },
-        warning: 'This password is shown only once. Save it now!'
+        employee: {
+          id: employee._id,
+          employeeId: employee.employeeId,
+          qrCode: employee.qrCode
+        }
       }
     });
 
@@ -220,7 +262,6 @@ exports.approveApplication = async (req, res) => {
     });
   }
 };
-
 // @desc    Reject application
 // @route   PUT /api/applications/:id/reject
 // @access  Private (Admin)

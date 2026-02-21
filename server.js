@@ -13,7 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const userRoutes = require('./routes/userRoutes'); 
-
+const employeeRoutes = require('./routes/employeeRoutes');
 const app = express();
 
 // Middleware
@@ -87,6 +87,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/users', userRoutes); 
+app.use('/api/employee', employeeRoutes);
 // 404 handler
 app.use((req, res, next) => {
   res.status(404).json({ 
@@ -116,4 +117,5 @@ app.listen(PORT, () => {
   console.log(`📍 Jobs API: http://localhost:${PORT}/api/jobs`);
   console.log(`📍 Applications API: http://localhost:${PORT}/api/applications`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📍 Employee API: http://localhost:${PORT}/api/employee`);
 });
