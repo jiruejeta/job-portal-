@@ -1,31 +1,23 @@
 const User = require('../models/User');
 
-// @desc    Get all users (with passwords - DEVELOPMENT ONLY!)
+// Helper function to generate unique ID number
+const generateIDNumber = () => {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const random = Math.floor(10000 + Math.random() * 90000);
+  return `ID-${year}-${random}`;
+};
+
+// @desc    Get all users
 // @route   GET /api/users
 // @access  Private/Admin
 exports.getAllUsers = async (req, res) => {
   try {
-    // For DEVELOPMENT ONLY - include password field
-    // In production, remove .select('+password')
-    const users = await User.find().select('+password').sort('-createdAt');
-    
-    // Map users to include plain password if available
-    const usersWithPasswords = users.map(user => {
-      const userObj = user.toObject();
-      
-      // Try to find plain password from applications (if stored)
-      // This is hacky and not reliable
-      return {
-        ...userObj,
-        // password is still hashed here, can't get plain text
-        // This shows why we can't display plain passwords later
-      };
-    });
+    const users = await User.find().select('-password').sort('-createdAt');
     
     res.json({
       success: true,
       count: users.length,
-      data: usersWithPasswords
+      data: users
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -35,14 +27,150 @@ exports.getAllUsers = async (req, res) => {
     });
   }
 };
-// @desc    Update applicant profile (add additional data)
+
+// @desc    Approve user ID card
+// @route   PUT /api/users/:userId/id-approve
+// @access  Private/Admin
+exports.approveID = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Check if user has uploaded a photo
+    if (!user.idPhoto) {
+      return res.status(400).json({
+        success: false,
+        error: 'User has not uploaded a photo yet'
+      });
+    }
+
+    // Generate unique ID number
+    const idNumber = generateIDNumber();
+    
+    // Update user
+    user.idNumber = idNumber;
+    user.idStatus = 'active';
+    user.idIssueDate = new Date();
+    
+    // Set expiry date to 5 years from now
+    const expiryDate = new Date();
+    expiryDate.setFullYear(expiryDate.getFullYear() + 5);
+    user.idExpiryDate = expiryDate;
+    
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'ID card approved successfully',
+      data: {
+        idNumber: user.idNumber,
+        idStatus: user.idStatus,
+        idIssueDate: user.idIssueDate,
+        idExpiryDate: user.idExpiryDate
+      }
+    });
+
+  } catch (error) {
+    console.error('Error approving ID:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Reject user ID card
+// @route   PUT /api/users/:userId/id-reject
+// @access  Private/Admin
+exports.rejectID = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { reason } = req.body;
+    
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Update user
+    user.idStatus = 'rejected';
+    user.idRejectionReason = reason || 'Photo does not meet requirements';
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'ID card rejected',
+      data: {
+        idStatus: user.idStatus,
+        rejectionReason: user.idRejectionReason
+      }
+    });
+
+  } catch (error) {
+    console.error('Error rejecting ID:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Upload ID photo
+// @route   PUT /api/users/photo
+// @access  Private
+exports.uploadPhoto = async (req, res) => {
+  try {
+    const { photo } = req.body;
+    
+    if (!photo) {
+      return res.status(400).json({
+        success: false,
+        error: 'Photo is required'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { 
+        idPhoto: photo,
+        idStatus: 'pending',
+        idRejectionReason: null // Clear any previous rejection
+      },
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Photo uploaded successfully. Waiting for admin approval.',
+      data: user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update applicant profile
 // @route   PUT /api/users/profile
 // @access  Private
 exports.updateProfile = async (req, res) => {
   try {
     const { faydaId, phone, address, documents, department } = req.body;
 
-    // Find user and update
     const user = await User.findByIdAndUpdate(
       req.user.id,
       {
@@ -89,7 +217,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// @desc    Upload document (simplified - just store URL/reference)
+// @desc    Upload document
 // @route   POST /api/users/documents
 // @access  Private
 exports.uploadDocument = async (req, res) => {

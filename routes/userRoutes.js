@@ -4,22 +4,36 @@ const {
   getProfile, 
   updateProfile, 
   uploadDocument,
-  getAllUsers
+  getAllUsers,
+  uploadPhoto,
+  approveID,
+  rejectID
 } = require('../controllers/userController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 
 // ============================================
-// PUBLIC ROUTES (but still require login)
+// ADMIN ROUTES
 // ============================================
+// Get all users - Admin only
+router.get('/', protect, authorize('admin'), getAllUsers);
 
-// Get all users - ANY logged-in user can access (temporary fix)
-router.get('/', protect, getAllUsers);
+// Approve user ID card - Admin only
+router.put('/:userId/id-approve', protect, authorize('admin'), approveID);
 
+// Reject user ID card - Admin only
+router.put('/:userId/id-reject', protect, authorize('admin'), rejectID);
+
+// ============================================
+// APPLICANT ROUTES
+// ============================================
 // Get own profile
 router.get('/profile', protect, getProfile);
 
 // Update own profile
 router.put('/profile', protect, updateProfile);
+
+// Upload ID photo
+router.put('/photo', protect, uploadPhoto);
 
 // Upload document
 router.post('/documents', protect, uploadDocument);
