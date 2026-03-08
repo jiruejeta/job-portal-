@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 
+// Define the schema first
 const employeeSchema = new mongoose.Schema({
   // Link to user account
   userId: {
@@ -101,10 +102,10 @@ const employeeSchema = new mongoose.Schema({
   }
 });
 
-// Update timestamp on save
-employeeSchema.pre('save', function(next) {
+// Update timestamp on save - FIXED: no parameters, no next() call
+employeeSchema.pre('save', function() {
   this.updatedAt = new Date();
-  next();
+  // No need to call next() - mongoose handles it automatically
 });
 
 // Generate a unique employee ID
@@ -112,20 +113,33 @@ employeeSchema.statics.generateEmployeeId = async function() {
   const prefix = 'EMP';
   const year = new Date().getFullYear().toString().slice(-2); // 24 for 2024
   
-  // Find the last employee to get the sequence number
-  const lastEmployee = await this.findOne().sort({ employeeId: -1 });
-  
-  let sequence = 1;
-  if (lastEmployee && lastEmployee.employeeId) {
-    // Extract the sequence number from last employee ID (EMP-24-0001 -> 1)
-    const lastSeq = parseInt(lastEmployee.employeeId.split('-')[2]);
-    sequence = lastSeq + 1;
+  try {
+    // Find the last employee to get the sequence number
+    const lastEmployee = await this.findOne().sort({ employeeId: -1 });
+    
+    let sequence = 1;
+    if (lastEmployee && lastEmployee.employeeId) {
+      // Extract the sequence number from last employee ID (EMP-24-0001 -> 1)
+      const parts = lastEmployee.employeeId.split('-');
+      if (parts.length === 3) {
+        const lastSeq = parseInt(parts[2]);
+        sequence = lastSeq + 1;
+      }
+    }
+    
+    // Format: EMP-YY-XXXX (e.g., EMP-24-0001)
+    const employeeId = `${prefix}-${year}-${sequence.toString().padStart(4, '0')}`;
+    return employeeId;
+    
+  } catch (error) {
+    console.error('Error generating employee ID:', error);
+    // Fallback: generate with timestamp
+    const timestamp = Date.now().toString().slice(-6);
+    return `${prefix}-${year}-${timestamp}`;
   }
-  
-  // Format: EMP-YY-XXXX (e.g., EMP-24-0001)
-  const employeeId = `${prefix}-${year}-${sequence.toString().padStart(4, '0')}`;
-  
-  return employeeId;
 };
 
-module.exports = mongoose.model('Employee', employeeSchema);
+// Check if model already exists to prevent overwrite error
+const Employee = mongoose.models.Employee || mongoose.model('Employee', employeeSchema);
+
+module.exports = Employee;
