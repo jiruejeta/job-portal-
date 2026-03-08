@@ -1,92 +1,121 @@
 const mongoose = require('mongoose');
 
-const jobSchema = new mongoose.Schema({
-  title: {
+// Check if the model already exists to prevent overwrite error
+const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema({
+  name: {
     type: String,
-    required: [true, 'Job title is required'],
+    required: true,
     trim: true
+  },
+  username: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
+  password: {
+    type: String
+  },
+  role: {
+    type: String,
+    enum: ['admin', 'applicant'],
+    default: 'applicant',
+    index: true
   },
   department: {
     type: String,
-    required: [true, 'Department is required'],
     trim: true
   },
-  description: {
-    type: String,
-    required: [true, 'Job description is required']
-  },
-  requirements: {
-    type: String,
-    required: [true, 'Requirements are required']
-  },
-  salary: {
-    type: String,
-    required: [true, 'Salary range is required']
-  },
-  location: {
-    type: String,
-    required: [true, 'Job location is required']
-  },
-  jobType: {
-    type: String,
-    enum: ['Full-time', 'Part-time', 'Contract', 'Remote', 'Internship'],
-    default: 'Full-time'
-  },
-  benefits: {
-    type: String,
-    default: ''
-  },
-  responsibilities: {
-    type: String,
-    default: ''
-  },
-  experience: {
-    type: String,
-    default: ''
-  },
-  education: {
-    type: String,
-    default: ''
-  },
-  skills: [{
+  faydaId: {
     type: String,
     trim: true
+  },
+  phone: {
+    type: String,
+    trim: true
+  },
+  address: {
+    type: String,
+    trim: true
+  },
+  email: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    index: true
+  },
+  documents: [{
+    url: String,
+    type: String,
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
   }],
-  deadline: {
-    type: Date,
-    required: [true, 'Application deadline is required']
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  isActive: {
+  isApproved: {
     type: Boolean,
-    default: true
+    default: false,
+    index: true
+  },
+  // ID Card Fields - For Photo Upload
+  idPhoto: {
+    type: String,
+    default: ''
+  },
+  idNumber: {
+    type: String,
+    unique: true,
+    sparse: true,
+    index: true
+  },
+  idStatus: {
+    type: String,
+    enum: ['pending', 'active', 'rejected', 'expired'],
+    default: 'pending',
+    index: true
+  },
+  idIssueDate: {
+    type: Date
+  },
+  idExpiryDate: {
+    type: Date
+  },
+  idRejectionReason: {
+    type: String,
+    default: null
+  },
+  idPhotoUploadedAt: {
+    type: Date
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true
   },
   updatedAt: {
     type: Date,
     default: Date.now
   }
-});
+}));
 
 // Update the updatedAt timestamp on save
-jobSchema.pre('save', function(next) {
+User.schema.pre('save', function(next) {
   this.updatedAt = new Date();
   next();
 });
 
 // Create indexes for faster queries
-jobSchema.index({ title: 'text', description: 'text', requirements: 'text' });
-jobSchema.index({ department: 1 });
-jobSchema.index({ isActive: 1 });
-jobSchema.index({ jobType: 1 });
-jobSchema.index({ location: 1 });
-jobSchema.index({ salary: 1 });
+User.schema.index({ email: 1 });
+User.schema.index({ role: 1 });
+User.schema.index({ idNumber: 1 });
+User.schema.index({ idStatus: 1 });
+User.schema.index({ isApproved: 1 });
 
-module.exports = mongoose.model('Job', jobSchema);
+// Compound index for searching
+User.schema.index({ 
+  name: 'text', 
+  email: 'text', 
+  username: 'text' 
+});
+
+module.exports = User;

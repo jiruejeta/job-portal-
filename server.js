@@ -8,12 +8,13 @@ require('./models/User');
 require('./models/Job');
 require('./models/Application');
 
-// Import routes - ONLY ONCE!
+// Import routes
 const authRoutes = require('./routes/authRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const userRoutes = require('./routes/userRoutes'); 
 const employeeRoutes = require('./routes/employeeRoutes');
+
 const app = express();
 
 // Middleware
@@ -21,21 +22,20 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// MongoDB Connection with options to fix DNS issues
+// MongoDB Connection
 console.log('🔌 Connecting to MongoDB...');
 console.log('📊 Environment:', process.env.NODE_ENV || 'development');
 console.log('🔑 MongoDB URI:', process.env.MONGO_URI ? '✅ URI exists' : '❌ URI missing');
 
-// Connection options to fix DNS issues on Windows
 const mongooseOptions = {
-  serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-  socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
-  family: 4, // Force IPv4 (this is the key fix for Windows!)
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  family: 4,
   retryWrites: true,
   w: 'majority',
-  maxPoolSize: 10, // Maintain up to 10 socket connections
-  minPoolSize: 2, // Maintain at least 2 socket connections
-  connectTimeoutMS: 10000, // Give up initial connection after 10 seconds
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  connectTimeoutMS: 10000,
 };
 
 mongoose.connect(process.env.MONGO_URI, mongooseOptions)
@@ -43,36 +43,14 @@ mongoose.connect(process.env.MONGO_URI, mongooseOptions)
     console.log('✅ MongoDB Connected Successfully!');
     console.log('📁 Database:', mongoose.connection.name);
     console.log('🌐 Host:', mongoose.connection.host);
-    console.log('🔌 Port:', mongoose.connection.port);
   })
   .catch(err => {
-    console.log('❌ MongoDB Connection Error:');
-    console.log('📛 Error name:', err.name);
-    console.log('🔢 Error code:', err.code);
-    console.log('💬 Error message:', err.message);
-    
-    // Additional helpful troubleshooting info
-    if (err.name === 'MongooseServerSelectionError') {
-      console.log('\n🔍 Troubleshooting tips:');
-      console.log('1️⃣ Check if your IP is whitelisted in MongoDB Atlas');
-      console.log('2️⃣ Verify your username and password are correct');
-      console.log('3️⃣ Try using Google DNS (8.8.8.8)');
-      console.log('4️⃣ Check if your network blocks MongoDB ports');
-      console.log('5️⃣ Try switching to standard connection string instead of SRV');
-    }
-    
-    if (err.code === 'ENOTFOUND') {
-      console.log('\n🌐 DNS Resolution Error:');
-      console.log('• Try flushing DNS: ipconfig /flushdns');
-      console.log('• Change DNS to 8.8.8.8');
-      console.log('• Restart your router');
-    }
+    console.log('❌ MongoDB Connection Error:', err.message);
   });
 
-// Debug route to check environment variables (remove in production)
+// Debug route to check environment variables
 app.get('/api/debug-env', (req, res) => {
   const mongoURI = process.env.MONGO_URI || 'not set';
-  // Hide password for security
   const maskedURI = mongoURI.replace(/:[^:]*@/, ':****@');
   
   res.json({
@@ -107,30 +85,15 @@ app.get('/api/test-db', async (req, res) => {
       3: 'disconnecting'
     };
     
-    // Get connection stats
-    const stats = {
-      state: states[dbState] || 'unknown',
-      database: mongoose.connection.name || 'not connected',
-      host: mongoose.connection.host || 'unknown',
-      port: mongoose.connection.port || 'unknown',
-      models: Object.keys(mongoose.models).length
-    };
-    
     res.json({
       success: dbState === 1,
-      databaseStatus: stats.state,
-      databaseName: stats.database,
-      host: stats.host,
-      port: stats.port,
-      activeModels: stats.models,
+      databaseStatus: states[dbState] || 'unknown',
+      databaseName: mongoose.connection.name || 'not connected',
       message: dbState === 1 ? '✅ Database is connected' : '❌ Database is not connected',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -147,18 +110,43 @@ app.get('/api/test-models', async (req, res) => {
       success: true,
       message: 'Models loaded successfully',
       models: models,
-      count: Object.values(models).filter(Boolean).length,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// Mount routes - ONLY ONCE!
+// DEBUG ROUTES - Add this to see all registered routes
+app.get('/api/debug-routes', (req, res) => {
+  const routes = [];
+  
+  const extractRoutes = (stack, basePath = '') => {
+    stack.forEach(layer => {
+      if (layer.route) {
+        const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
+        routes.push({
+          path: basePath + layer.route.path,
+          methods: methods
+        });
+      } else if (layer.name === 'router' && layer.handle.stack) {
+        extractRoutes(layer.handle.stack, basePath + (layer.regexp.source
+          .replace('\\/?(?=\\/|$)', '')
+          .replace(/\\\//g, '/')
+          .replace(/\^/g, '')
+          .replace(/\?/g, '')));
+      }
+    });
+  };
+  
+  extractRoutes(app._router.stack);
+  res.json({
+    totalRoutes: routes.length,
+    routes: routes.sort((a, b) => a.path.localeCompare(b.path))
+  });
+});
+
+// Mount routes - ORDER MATTERS! Auth first, then others
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
@@ -191,6 +179,7 @@ app.listen(PORT, () => {
   console.log(`📍 Test API: http://localhost:${PORT}`);
   console.log(`📍 Test DB: http://localhost:${PORT}/api/test-db`);
   console.log(`📍 Debug Env: http://localhost:${PORT}/api/debug-env`);
+  console.log(`📍 Debug Routes: http://localhost:${PORT}/api/debug-routes`);
   console.log(`📍 Auth API: http://localhost:${PORT}/api/auth`);
   console.log(`📍 Jobs API: http://localhost:${PORT}/api/jobs`);
   console.log(`📍 Applications API: http://localhost:${PORT}/api/applications`);

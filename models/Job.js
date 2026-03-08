@@ -6,13 +6,13 @@ const Job = mongoose.models.Job || mongoose.model('Job', new mongoose.Schema({
     type: String,
     required: [true, 'Job title is required'],
     trim: true,
-    text: true  // Add text index here instead of separate index
+    text: true
   },
   department: {
     type: String,
     required: [true, 'Department is required'],
     trim: true,
-    index: true  // Add index here
+    index: true
   },
   description: {
     type: String,
@@ -26,35 +26,37 @@ const Job = mongoose.models.Job || mongoose.model('Job', new mongoose.Schema({
   },
   salary: {
     type: String,
+    required: [true, 'Salary range is required'],
     trim: true,
     index: true
   },
   location: {
     type: String,
+    required: [true, 'Job location is required'],
     trim: true,
     index: true
   },
   jobType: {
     type: String,
-    enum: ['Full-time', 'Part-time', 'Contract', 'Remote', 'Internship', ''],
-    default: '',
+    enum: ['Full-time', 'Part-time', 'Contract', 'Remote', 'Internship'],
+    default: 'Full-time',
     index: true
   },
   benefits: {
     type: String,
-    trim: true
+    default: ''
   },
   responsibilities: {
     type: String,
-    trim: true
+    default: ''
   },
   experience: {
     type: String,
-    trim: true
+    default: ''
   },
   education: {
     type: String,
-    trim: true
+    default: ''
   },
   skills: [{
     type: String,
@@ -90,6 +92,11 @@ Job.schema.pre('save', function(next) {
   next();
 });
 
-// Remove the separate schema.index() calls to avoid duplicates
+// Create compound text index for search functionality
+Job.schema.index({ 
+  title: 'text', 
+  description: 'text', 
+  requirements: 'text' 
+});
 
 module.exports = Job;

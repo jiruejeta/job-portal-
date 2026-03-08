@@ -16,7 +16,6 @@ exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // Validate input
     if (!username || !password) {
       return res.status(400).json({
         success: false,
@@ -24,7 +23,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check if user exists
     const user = await User.findOne({ username });
     
     if (!user) {
@@ -34,7 +32,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Check if user is approved (for applicants)
     if (user.role === 'applicant' && !user.isApproved) {
       return res.status(401).json({
         success: false,
@@ -42,7 +39,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Verify password
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     
     if (!isPasswordMatch) {
@@ -52,7 +48,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Generate token
     const token = generateToken(user._id);
 
     res.json({
@@ -97,12 +92,20 @@ exports.getMe = async (req, res) => {
   }
 };
 
-// @desc    Create admin user (for setup - remove in production)
+// @desc    Create admin user
 // @route   POST /api/auth/create-admin
-// @access  Public (temporary)
+// @access  Public (only works once)
 exports.createAdmin = async (req, res) => {
   try {
     const { name, username, password } = req.body;
+
+    // Validate input
+    if (!name || !username || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide name, username and password'
+      });
+    }
 
     // Check if admin already exists
     const adminExists = await User.findOne({ role: 'admin' });
@@ -123,7 +126,8 @@ exports.createAdmin = async (req, res) => {
       username,
       password: hashedPassword,
       role: 'admin',
-      isApproved: true
+      isApproved: true,
+      idStatus: 'active'
     });
 
     res.status(201).json({
@@ -138,15 +142,16 @@ exports.createAdmin = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Create admin error:', error);
     res.status(500).json({
       success: false,
       error: error.message
     });
   }
-  // Add this at the very end of the file temporarily
+};
+
 console.log('✅ authController loaded:', {
   login: typeof exports.login,
   getMe: typeof exports.getMe,
   createAdmin: typeof exports.createAdmin
 });
-};

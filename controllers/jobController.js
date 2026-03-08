@@ -5,13 +5,27 @@ const Job = require('../models/Job');
 // @access  Private (Admin only)
 exports.createJob = async (req, res) => {
   try {
-    const { title, department, description, requirements, deadline } = req.body;
+    const { 
+      title, 
+      department, 
+      description, 
+      requirements, 
+      salary,
+      location,
+      jobType,
+      benefits,
+      responsibilities,
+      experience,
+      education,
+      skills,
+      deadline 
+    } = req.body;
 
     // Basic validation
-    if (!title || !department || !description || !requirements || !deadline) {
+    if (!title || !department || !description || !requirements || !salary || !location || !deadline) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide all required fields'
+        error: 'Please provide all required fields: title, department, description, requirements, salary, location, deadline'
       });
     }
 
@@ -20,8 +34,16 @@ exports.createJob = async (req, res) => {
       department,
       description,
       requirements,
+      salary,
+      location,
+      jobType: jobType || 'Full-time',
+      benefits: benefits || '',
+      responsibilities: responsibilities || '',
+      experience: experience || '',
+      education: education || '',
+      skills: skills || [],
       deadline,
-      createdBy: req.user.id // We'll add user later
+      createdBy: req.user.id
     });
 
     res.status(201).json({
@@ -29,6 +51,7 @@ exports.createJob = async (req, res) => {
       data: job
     });
   } catch (error) {
+    console.error('Create job error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -50,6 +73,7 @@ exports.getJobs = async (req, res) => {
       data: jobs
     });
   } catch (error) {
+    console.error('Get jobs error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -76,6 +100,7 @@ exports.getJob = async (req, res) => {
       data: job
     });
   } catch (error) {
+    console.error('Get job error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -106,6 +131,7 @@ exports.updateJob = async (req, res) => {
       data: job
     });
   } catch (error) {
+    console.error('Update job error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -136,6 +162,7 @@ exports.deleteJob = async (req, res) => {
       message: 'Job deleted successfully'
     });
   } catch (error) {
+    console.error('Delete job error:', error);
     res.status(500).json({
       success: false,
       error: error.message
