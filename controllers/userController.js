@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const cloudinary = require('../utils/cloudinary');
 
 // Helper function to generate unique ID number
 const generateIDNumber = () => {
@@ -127,7 +128,7 @@ exports.rejectID = async (req, res) => {
   }
 };
 
-// @desc    Upload ID photo
+// @desc    Upload ID photo to Cloudinary
 // @route   PUT /api/users/photo
 // @access  Private
 exports.uploadPhoto = async (req, res) => {
@@ -141,25 +142,61 @@ exports.uploadPhoto = async (req, res) => {
       });
     }
 
+    console.log('Uploading photo to Cloudinary...');
+
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(photo, {
+      folder: 'id_photos',
+      transformation: [
+        { width: 600, height: 600, crop: 'limit' },
+        { quality: 'auto' }
+      ]
+    });
+
+    console.log('Cloudinary upload successful:', result.secure_url);
+
+    // Store only the URL in MongoDB
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { 
-        idPhoto: photo,
+        idPhoto: result.secure_url,
         idStatus: 'pending',
-        idRejectionReason: null // Clear any previous rejection
+        idRejectionReason: null,
+        idPhotoUploadedAt: new Date()
       },
-      { new: true }
+      { new: true, runValidators: true }
     ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
 
     res.json({
       success: true,
       message: 'Photo uploaded successfully. Waiting for admin approval.',
-      data: user
+      data: {
+        idPhoto: user.idPhoto,
+        idStatus: user.idStatus
+      }
     });
+
   } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    
+    // Check for specific Cloudinary errors
+    if (error.http_code && error.http_code === 413) {
+      return res.status(400).json({
+        success: false,
+        error: 'Image too large. Please compress your image.'
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Failed to upload photo'
     });
   }
 };
