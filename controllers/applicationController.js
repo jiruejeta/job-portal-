@@ -143,9 +143,10 @@ exports.getPendingApplications = async (req, res) => {
 // @desc    Approve application and generate credentials
 // @route   PUT /api/applications/:id/approve
 // @desc    Approve application and generate credentials + employee ID
+// @desc    Approve application and generate credentials + employee ID
 // @route   PUT /api/applications/:id/approve
 // @access  Private (Admin)
-exports.approveApplication = async (req, res) => {
+exports.approveApplication = async (req, res, next) => {  // Added 'next' parameter
   try {
     const application = await Application.findById(req.params.id).populate('jobId');
     
@@ -160,6 +161,14 @@ exports.approveApplication = async (req, res) => {
       return res.status(400).json({
         success: false,
         error: `Application already ${application.status}`
+      });
+    }
+
+    // Check if job exists
+    if (!application.jobId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Associated job not found. The job may have been deleted.'
       });
     }
 
@@ -182,46 +191,70 @@ exports.approveApplication = async (req, res) => {
       username: plainUsername,
       password: hashedPassword,
       role: 'applicant',
-      department: application.jobId ? application.jobId.department : 'General',
+      department: application.jobId.department || 'General',
       isApproved: true,
       phone: application.phone,
       email: application.email
     });
 
-    // ===== NEW: GENERATE EMPLOYEE ID AND QR CODE =====
+    // ===== GENERATE EMPLOYEE ID AND QR CODE =====
     
-    // Generate unique employee ID
-    const employeeId = await Employee.generateEmployeeId();
+    // Generate unique employee ID with fallback
+    let employeeId;
+    try {
+      if (typeof Employee.generateEmployeeId === 'function') {
+        employeeId = await Employee.generateEmployeeId();
+      } else {
+        const year = new Date().getFullYear().toString().slice(-2);
+        const random = Math.floor(1000 + Math.random() * 9000);
+        employeeId = `EMP-${year}-${random}`;
+      }
+    } catch (err) {
+      console.error('Employee ID generation failed, using fallback:', err);
+      const year = new Date().getFullYear().toString().slice(-2);
+      const random = Math.floor(1000 + Math.random() * 9000);
+      employeeId = `EMP-${year}-${random}`;
+    }
     
     // Create data for QR code
     const qrData = JSON.stringify({
       id: employeeId,
       name: application.applicantName,
-      job: application.jobId.title,
-      dept: application.jobId.department,
+      job: application.jobId.title || 'Unknown',
+      dept: application.jobId.department || 'General',
       date: new Date().toISOString().split('T')[0]
     });
     
     // Generate QR code as data URL
-    const qrCodeDataURL = await QRCode.toDataURL(qrData);
+    let qrCodeDataURL = '';
+    try {
+      qrCodeDataURL = await QRCode.toDataURL(qrData);
+    } catch (err) {
+      console.error('QR Code generation failed:', err);
+    }
 
     // Create employee record
-    const employee = await Employee.create({
-      userId: user._id,
-      applicationId: application._id,
-      jobId: application.jobId._id,
-      employeeId: employeeId,
-      fullName: application.applicantName,
-      email: application.email,
-      phone: application.phone,
-      jobTitle: application.jobId.title,
-      department: application.jobId.department,
-      salary: application.jobId.salary || 'Not specified',
-      location: application.jobId.location || 'Not specified',
-      jobType: application.jobId.jobType || 'Full-time',
-      qrCode: qrCodeDataURL,
-      qrCodeGeneratedAt: new Date()
-    });
+    let employee = null;
+    try {
+      employee = await Employee.create({
+        userId: user._id,
+        applicationId: application._id,
+        jobId: application.jobId._id,
+        employeeId: employeeId,
+        fullName: application.applicantName,
+        email: application.email,
+        phone: application.phone,
+        jobTitle: application.jobId.title || 'Unknown',
+        department: application.jobId.department || 'General',
+        salary: application.jobId.salary || 'Not specified',
+        location: application.jobId.location || 'Not specified',
+        jobType: application.jobId.jobType || 'Full-time',
+        qrCode: qrCodeDataURL,
+        qrCodeGeneratedAt: new Date()
+      });
+    } catch (err) {
+      console.error('Employee creation failed:', err);
+    }
 
     // Update application
     application.status = 'approved';
@@ -229,10 +262,10 @@ exports.approveApplication = async (req, res) => {
     application.generatedPassword = plainPassword;
     await application.save();
 
-    // Return success with credentials AND employee info
+    // Return success with credentials
     res.json({
       success: true,
-      message: 'Application approved successfully. Employee ID generated.',
+      message: 'Application approved successfully.' + (employee ? ' Employee ID generated.' : ''),
       data: {
         application: {
           id: application._id,
@@ -246,11 +279,11 @@ exports.approveApplication = async (req, res) => {
           email: user.email,
           role: user.role
         },
-        employee: {
+        employee: employee ? {
           id: employee._id,
           employeeId: employee.employeeId,
           qrCode: employee.qrCode
-        }
+        } : null
       }
     });
 
@@ -375,3 +408,20 @@ exports.getRejectedApplications = async (req, res) => {
     });
   }
 };
+// TEMPORARY TEST FUNCTION - Add this right after your imports
+exports.testApprove = async (req, res, next) => {
+  console.log('✅ TEST FUNCTION CALLED!');
+  console.log('  params:', req.params);
+  console.log('  next is function:', typeof next === 'function');
+  return res.json({
+    success: true,
+    message: 'Test function works!',
+    nextIsFunction: typeof next === 'function'
+  });
+};
+// Add this at the VERY BOTTOM of your applicationController.js
+console.log('\n🔍 DEBUG: applicationController exports:');
+console.log('  approveApplication type:', typeof exports.approveApplication);
+console.log('  approveApplication is function:', typeof exports.approveApplication === 'function');
+console.log('  rejectApplication type:', typeof exports.rejectApplication);
+console.log('  getAllApplications type:', typeof exports.getAllApplications);
