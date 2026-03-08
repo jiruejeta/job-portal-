@@ -1,57 +1,92 @@
 const mongoose = require('mongoose');
 
-const userSchema = new mongoose.Schema({
-  name: {
+const jobSchema = new mongoose.Schema({
+  title: {
     type: String,
-    required: [true, 'Name is required'],
+    required: [true, 'Job title is required'],
     trim: true
-  },
-  username: {
-    type: String,
-    unique: true,
-    sparse: true, // Allows null/undefined values
-    trim: true
-  },
-  password: {
-    type: String
-  },
-  role: {
-    type: String,
-    enum: ['admin', 'applicant'],
-    default: 'applicant'
   },
   department: {
     type: String,
+    required: [true, 'Department is required'],
     trim: true
   },
-  faydaId: {
+  description: {
     type: String,
-    trim: true
+    required: [true, 'Job description is required']
   },
-  phone: {
+  requirements: {
     type: String,
-    trim: true
+    required: [true, 'Requirements are required']
   },
-  address: {
+  salary: {
     type: String,
-    trim: true
+    required: [true, 'Salary range is required']
   },
-  documents: [{
-    type: String, // URLs to uploaded documents
+  location: {
+    type: String,
+    required: [true, 'Job location is required']
+  },
+  jobType: {
+    type: String,
+    enum: ['Full-time', 'Part-time', 'Contract', 'Remote', 'Internship'],
+    default: 'Full-time'
+  },
+  benefits: {
+    type: String,
+    default: ''
+  },
+  responsibilities: {
+    type: String,
+    default: ''
+  },
+  experience: {
+    type: String,
+    default: ''
+  },
+  education: {
+    type: String,
+    default: ''
+  },
+  skills: [{
+    type: String,
     trim: true
   }],
-  isApproved: {
+  deadline: {
+    type: Date,
+    required: [true, 'Application deadline is required']
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  isActive: {
     type: Boolean,
-    default: false
+    default: true
   },
   createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
     type: Date,
     default: Date.now
   }
 });
 
-// Create index for faster queries
-userSchema.index({ email: 1 });
-userSchema.index({ role: 1 });
+// Update the updatedAt timestamp on save
+jobSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
 
-module.exports = mongoose.model('User', userSchema);
+// Create indexes for faster queries
+jobSchema.index({ title: 'text', description: 'text', requirements: 'text' });
+jobSchema.index({ department: 1 });
+jobSchema.index({ isActive: 1 });
+jobSchema.index({ jobType: 1 });
+jobSchema.index({ location: 1 });
+jobSchema.index({ salary: 1 });
+
+module.exports = mongoose.model('Job', jobSchema);
