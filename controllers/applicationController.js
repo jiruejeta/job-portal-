@@ -4,6 +4,7 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const Employee = require('../models/Employee');
 const QRCode = require('qrcode');
+const { sendApprovalEmail, sendRejectionEmail } = require('../utils/emailService');
 // Import credential generator
 const { generateUsername, generatePassword, hashPassword } = require('../utils/generateCredentials');
 
