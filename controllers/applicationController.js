@@ -112,6 +112,7 @@ exports.getAllApplications = async (req, res) => {
       data: applications
     });
   } catch (error) {
+    console.error('Get all applications error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -134,6 +135,7 @@ exports.getPendingApplications = async (req, res) => {
       data: applications
     });
   } catch (error) {
+    console.error('Get pending applications error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -141,13 +143,10 @@ exports.getPendingApplications = async (req, res) => {
   }
 };
 
-// @desc    Approve application and generate credentials
-// @route   PUT /api/applications/:id/approve
-// @desc    Approve application and generate credentials + employee ID
-// @desc    Approve application and generate credentials + employee ID
+// @desc    Approve application and generate credentials + employee ID + send email
 // @route   PUT /api/applications/:id/approve
 // @access  Private (Admin)
-exports.approveApplication = async (req, res, next) => {  // Added 'next' parameter
+exports.approveApplication = async (req, res, next) => {
   try {
     const application = await Application.findById(req.params.id).populate('jobId');
     
@@ -174,8 +173,6 @@ exports.approveApplication = async (req, res, next) => {  // Added 'next' parame
     }
 
     // GENERATE CREDENTIALS
-    const { generateUsername, generatePassword, hashPassword } = require('../utils/generateCredentials');
-    
     let plainUsername = generateUsername(application.applicantName);
     const plainPassword = generatePassword(application.applicantName);
     const hashedPassword = await hashPassword(plainPassword);
@@ -253,6 +250,7 @@ exports.approveApplication = async (req, res, next) => {  // Added 'next' parame
         qrCode: qrCodeDataURL,
         qrCodeGeneratedAt: new Date()
       });
+      console.log('✅ Employee created:', employee.employeeId);
     } catch (err) {
       console.error('Employee creation failed:', err);
     }
@@ -263,10 +261,29 @@ exports.approveApplication = async (req, res, next) => {  // Added 'next' parame
     application.generatedPassword = plainPassword;
     await application.save();
 
+    // ===== SEND APPROVAL EMAIL =====
+    let emailSent = false;
+    try {
+      emailSent = await sendApprovalEmail(
+        application.email,
+        application.applicantName,
+        application.jobId.title,
+        plainUsername,
+        plainPassword
+      );
+      if (emailSent) {
+        console.log('✅ Approval email sent to:', application.email);
+      } else {
+        console.log('⚠️ Approval email failed to send, but application was approved');
+      }
+    } catch (emailError) {
+      console.error('❌ Email error:', emailError);
+    }
+
     // Return success with credentials
     res.json({
       success: true,
-      message: 'Application approved successfully.' + (employee ? ' Employee ID generated.' : ''),
+      message: 'Application approved successfully.' + (employee ? ' Employee ID generated.' : '') + (emailSent ? ' Email sent.' : ''),
       data: {
         application: {
           id: application._id,
@@ -296,12 +313,13 @@ exports.approveApplication = async (req, res, next) => {  // Added 'next' parame
     });
   }
 };
-// @desc    Reject application
+
+// @desc    Reject application and send rejection email
 // @route   PUT /api/applications/:id/reject
 // @access  Private (Admin)
 exports.rejectApplication = async (req, res) => {
   try {
-    const application = await Application.findById(req.params.id);
+    const application = await Application.findById(req.params.id).populate('jobId');
     
     if (!application) {
       return res.status(404).json({
@@ -321,9 +339,24 @@ exports.rejectApplication = async (req, res) => {
     application.status = 'rejected';
     await application.save();
 
+    // ===== SEND REJECTION EMAIL =====
+    let emailSent = false;
+    try {
+      emailSent = await sendRejectionEmail(
+        application.email,
+        application.applicantName,
+        application.jobId?.title || 'the position'
+      );
+      if (emailSent) {
+        console.log('✅ Rejection email sent to:', application.email);
+      }
+    } catch (emailError) {
+      console.error('❌ Rejection email error:', emailError);
+    }
+
     res.json({
       success: true,
-      message: 'Application rejected successfully',
+      message: 'Application rejected successfully' + (emailSent ? '. Email sent.' : ''),
       data: {
         id: application._id,
         applicantName: application.applicantName,
@@ -332,6 +365,7 @@ exports.rejectApplication = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Reject application error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -359,6 +393,7 @@ exports.getApplication = async (req, res) => {
       data: application
     });
   } catch (error) {
+    console.error('Get application error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -381,6 +416,7 @@ exports.getApprovedApplications = async (req, res) => {
       data: applications
     });
   } catch (error) {
+    console.error('Get approved applications error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -403,13 +439,15 @@ exports.getRejectedApplications = async (req, res) => {
       data: applications
     });
   } catch (error) {
+    console.error('Get rejected applications error:', error);
     res.status(500).json({
       success: false,
       error: error.message
     });
   }
 };
-// TEMPORARY TEST FUNCTION - Add this right after your imports
+
+// TEMPORARY TEST FUNCTION
 exports.testApprove = async (req, res, next) => {
   console.log('✅ TEST FUNCTION CALLED!');
   console.log('  params:', req.params);
@@ -420,7 +458,8 @@ exports.testApprove = async (req, res, next) => {
     nextIsFunction: typeof next === 'function'
   });
 };
-// Add this at the VERY BOTTOM of your applicationController.js
+
+// Debug log at the bottom
 console.log('\n🔍 DEBUG: applicationController exports:');
 console.log('  approveApplication type:', typeof exports.approveApplication);
 console.log('  approveApplication is function:', typeof exports.approveApplication === 'function');
