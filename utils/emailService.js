@@ -1,10 +1,28 @@
+// Use require with a different approach
 const nodemailer = require('nodemailer');
 
-console.log('✅ emailService.js - LOADED WITH CORRECT nodemailer!');
+console.log('✅ emailService.js loaded');
+
+// Check if nodemailer was imported correctly
+console.log('📧 nodemailer type:', typeof nodemailer);
+console.log('📧 nodemailer.createTransporter type:', typeof nodemailer.createTransporter);
+
+// If createTransporter is undefined, try using default
+const transporter = nodemailer.createTransporter || nodemailer.default?.createTransporter;
 
 const createTransporter = () => {
-  console.log('🔄 Creating transporter with nodemailer...');
-  return nodemailer.createTransporter({
+  console.log('🔄 Creating transporter...');
+  
+  // Use the transporter we found
+  const create = nodemailer.createTransporter || nodemailer.default?.createTransporter;
+  
+  if (!create) {
+    console.error('❌ nodemailer.createTransporter is not available!');
+    console.log('📧 Available methods:', Object.keys(nodemailer));
+    throw new Error('nodemailer.createTransporter not available');
+  }
+  
+  return create({
     service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
@@ -70,6 +88,7 @@ exports.sendApprovalEmail = async (to, name, jobTitle, username, password) => {
 
   } catch (error) {
     console.error('❌ Email error:', error.message);
+    console.error('📧 Error stack:', error.stack);
     return false;
   }
 };
