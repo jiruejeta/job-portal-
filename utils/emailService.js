@@ -1,30 +1,52 @@
 const nodemailer = require('nodemailer');
 
-console.log('✅ emailService.js loaded');
-console.log('📧 nodemailer methods:', Object.keys(nodemailer));
+console.log('✅ emailService.js loaded with Ethereal fallback');
 
-const createTransporter = () => {
-  console.log('🔄 Creating transporter with IPv4 fix...');
+// Try Gmail first, fallback to Ethereal
+const createTransporter = async () => {
+  console.log('🔄 Creating transporter...');
   
-  return nodemailer.createTransport({
-    // Use explicit host and port instead of 'service' to have more control
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    },
-    // Force IPv4 - THIS IS THE KEY FIX
-    family: 4,
-    tls: {
-      rejectUnauthorized: false,
-      ciphers: 'SSLv3'
-    },
-    // Timeouts to prevent hanging
-    connectionTimeout: 10000,
-    socketTimeout: 10000
-  });
+  // Try Gmail with explicit host
+  try {
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,  // Use 587 instead of 465
+      secure: false,  // TLS, not SSL
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      family: 4,
+      tls: {
+        rejectUnauthorized: false
+      },
+      connectionTimeout: 5000,
+      socketTimeout: 5000
+    });
+    
+    await transporter.verify();
+    console.log('✅ Gmail transporter verified!');
+    return transporter;
+  } catch (error) {
+    console.log('⚠️ Gmail failed, trying Ethereal...');
+    
+    // Create a test account on Ethereal (free, no restrictions)
+    const testAccount = await nodemailer.createTestAccount();
+    console.log('📧 Ethereal account created:', testAccount.user);
+    
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false,
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass
+      }
+    });
+    
+    console.log('✅ Ethereal transporter ready!');
+    return transporter;
+  }
 };
 
 // Send email to applicant when approved
@@ -32,16 +54,10 @@ exports.sendApprovalEmail = async (to, name, jobTitle, username, password) => {
   try {
     console.log(`📧 Sending approval email to ${to}...`);
     
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.error('❌ Email credentials missing');
-      return false;
-    }
-
-    const transporter = createTransporter();
-    await transporter.verify();
+    const transporter = await createTransporter();
     
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_USER || 'no-reply@jobportal.com',
       to: to,
       subject: '🎉 Congratulations! Your Application Has Been Approved',
       html: `
@@ -78,11 +94,16 @@ exports.sendApprovalEmail = async (to, name, jobTitle, username, password) => {
     const info = await transporter.sendMail(mailOptions);
     console.log('✅ Email sent successfully!');
     console.log('📧 Message ID:', info.messageId);
+    
+    // If using Ethereal, show preview URL
+    if (transporter.options.host === 'smtp.ethereal.email') {
+      console.log('📧 Preview URL:', nodemailer.getTestMessageUrl(info));
+    }
+    
     return true;
 
   } catch (error) {
     console.error('❌ Email error:', error.message);
-    console.error('📧 Error stack:', error.stack);
     return false;
   }
 };
@@ -91,17 +112,11 @@ exports.sendApprovalEmail = async (to, name, jobTitle, username, password) => {
 exports.sendRejectionEmail = async (to, name, jobTitle) => {
   try {
     console.log(`📧 Sending rejection email to ${to}...`);
-    
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.error('❌ Email credentials missing');
-      return false;
-    }
 
-    const transporter = createTransporter();
-    await transporter.verify();
+    const transporter = await createTransporter();
     
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_USER || 'no-reply@jobportal.com',
       to: to,
       subject: 'Application Status Update',
       html: `
@@ -132,7 +147,7 @@ exports.sendRejectionEmail = async (to, name, jobTitle) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
     console.log('✅ Rejection email sent to:', to);
     return true;
 
