@@ -1,27 +1,29 @@
-// Import nodemailer correctly
 const nodemailer = require('nodemailer');
 
 console.log('✅ emailService.js loaded');
 console.log('📧 nodemailer methods:', Object.keys(nodemailer));
 
 const createTransporter = () => {
-  console.log('🔄 Creating transporter...');
-  
-  // Use createTransport (NOT createTransporter!)
-  if (typeof nodemailer.createTransport !== 'function') {
-    console.error('❌ nodemailer.createTransport is not available!');
-    console.log('📧 Available methods:', Object.keys(nodemailer));
-    throw new Error('nodemailer.createTransport not available');
-  }
+  console.log('🔄 Creating transporter with IPv4 fix...');
   
   return nodemailer.createTransport({
-    service: 'gmail',
+    // Use explicit host and port instead of 'service' to have more control
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS
     },
-    secure: true,
-    tls: { rejectUnauthorized: false }
+    // Force IPv4 - THIS IS THE KEY FIX
+    family: 4,
+    tls: {
+      rejectUnauthorized: false,
+      ciphers: 'SSLv3'
+    },
+    // Timeouts to prevent hanging
+    connectionTimeout: 10000,
+    socketTimeout: 10000
   });
 };
 
