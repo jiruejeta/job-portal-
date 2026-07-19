@@ -2,14 +2,12 @@
 const nodemailer = require('nodemailer');
 
 console.log('✅ emailService.js loaded');
-console.log('📧 nodemailer type:', typeof nodemailer);
-console.log('📧 nodemailer.createTransport type:', typeof nodemailer.createTransport);
+console.log('📧 nodemailer methods:', Object.keys(nodemailer));
 
-// Use createTransport (not createTransporter!)
 const createTransporter = () => {
   console.log('🔄 Creating transporter...');
   
-  // Check if createTransport exists
+  // Use createTransport (NOT createTransporter!)
   if (typeof nodemailer.createTransport !== 'function') {
     console.error('❌ nodemailer.createTransport is not available!');
     console.log('📧 Available methods:', Object.keys(nodemailer));
