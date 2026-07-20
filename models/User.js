@@ -57,7 +57,8 @@ const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema(
     default: false,
     index: true
   },
-  // ID Card Fields - For Photo Upload
+  
+  // ===== ID CARD FIELDS =====
   idPhoto: {
     type: String,
     default: ''
@@ -87,6 +88,52 @@ const User = mongoose.models.User || mongoose.model('User', new mongoose.Schema(
   idPhotoUploadedAt: {
     type: Date
   },
+
+  // ===== NEW: CV & DOCUMENTS =====
+  cv: {
+    type: String,
+    default: ''
+  },
+  additionalDocuments: [{
+    type: String
+  }],
+
+  // ===== NEW: COMMENT =====
+  comment: {
+    type: String,
+    default: ''
+  },
+
+  // ===== NEW: PAYMENT INFORMATION =====
+  paymentPhone: {
+    type: String,
+    default: ''
+  },
+  paymentScreenshot: {
+    type: String,
+    default: ''
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'verified', 'rejected'],
+    default: 'pending'
+  },
+
+  // ===== NEW: INTERVIEW INFORMATION =====
+  interviewStatus: {
+    type: String,
+    enum: ['pending', 'scheduled', 'completed', 'rejected'],
+    default: 'pending'
+  },
+  interviewDate: {
+    type: Date
+  },
+  interviewNotes: {
+    type: String,
+    default: ''
+  },
+
+  // ===== TIMESTAMPS =====
   createdAt: {
     type: Date,
     default: Date.now,
@@ -110,6 +157,8 @@ User.schema.index({ role: 1 });
 User.schema.index({ idNumber: 1 });
 User.schema.index({ idStatus: 1 });
 User.schema.index({ isApproved: 1 });
+User.schema.index({ interviewStatus: 1 });
+User.schema.index({ paymentStatus: 1 });
 
 // Compound index for searching
 User.schema.index({ 

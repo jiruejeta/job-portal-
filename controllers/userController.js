@@ -254,7 +254,45 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// @desc    Upload document
+// ============================================
+// NEW FUNCTIONS FOR APPLICANT DASHBOARD
+// ============================================
+
+// @desc    Upload CV
+// @route   POST /api/users/upload-cv
+// @access  Private
+exports.uploadCV = async (req, res) => {
+  try {
+    const { cv } = req.body;
+    
+    if (!cv) {
+      return res.status(400).json({
+        success: false,
+        error: 'CV file is required'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { cv: cv },
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'CV uploaded successfully',
+      data: { cv: user.cv }
+    });
+  } catch (error) {
+    console.error('Upload CV error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Upload document (general) - This is the original uploadDocument function
 // @route   POST /api/users/documents
 // @access  Private
 exports.uploadDocument = async (req, res) => {
@@ -282,6 +320,189 @@ exports.uploadDocument = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('Upload document error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update comment
+// @route   PUT /api/users/update-comment
+// @access  Private
+exports.updateComment = async (req, res) => {
+  try {
+    const { comment } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { comment: comment || '' },
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Comment updated successfully',
+      data: { comment: user.comment }
+    });
+  } catch (error) {
+    console.error('Update comment error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update payment info
+// @route   PUT /api/users/update-payment
+// @access  Private
+exports.updatePaymentInfo = async (req, res) => {
+  try {
+    const { paymentPhone, paymentScreenshot } = req.body;
+
+    const updateData = {};
+    if (paymentPhone) updateData.paymentPhone = paymentPhone;
+    if (paymentScreenshot) updateData.paymentScreenshot = paymentScreenshot;
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      updateData,
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Payment info updated successfully',
+      data: {
+        paymentPhone: user.paymentPhone,
+        paymentScreenshot: user.paymentScreenshot,
+        paymentStatus: user.paymentStatus
+      }
+    });
+  } catch (error) {
+    console.error('Update payment error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Upload payment screenshot
+// @route   POST /api/users/upload-payment
+// @access  Private
+exports.uploadPaymentScreenshot = async (req, res) => {
+  try {
+    const { screenshot } = req.body;
+    
+    if (!screenshot) {
+      return res.status(400).json({
+        success: false,
+        error: 'Screenshot is required'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { 
+        paymentScreenshot: screenshot,
+        paymentStatus: 'pending'
+      },
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Payment screenshot uploaded successfully',
+      data: {
+        paymentScreenshot: user.paymentScreenshot,
+        paymentStatus: user.paymentStatus
+      }
+    });
+  } catch (error) {
+    console.error('Upload payment screenshot error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update interview status (Admin only)
+// @route   PUT /api/users/:userId/interview-status
+// @access  Private/Admin
+exports.updateInterviewStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { interviewStatus, interviewDate, interviewNotes } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        interviewStatus,
+        interviewDate: interviewDate || null,
+        interviewNotes: interviewNotes || ''
+      },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Interview status updated successfully',
+      data: {
+        interviewStatus: user.interviewStatus,
+        interviewDate: user.interviewDate,
+        interviewNotes: user.interviewNotes
+      }
+    });
+  } catch (error) {
+    console.error('Update interview status error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// @desc    Verify payment (Admin only)
+// @route   PUT /api/users/:userId/verify-payment
+// @access  Private/Admin
+exports.verifyPayment = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { paymentStatus } = req.body; // 'verified' or 'rejected'
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { paymentStatus },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Payment ${paymentStatus} successfully`,
+      data: {
+        paymentStatus: user.paymentStatus
+      }
+    });
+  } catch (error) {
+    console.error('Verify payment error:', error);
     res.status(500).json({
       success: false,
       error: error.message
