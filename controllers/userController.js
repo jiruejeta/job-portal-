@@ -292,12 +292,19 @@ exports.uploadCV = async (req, res) => {
   }
 };
 
-// @desc    Upload document (general) - This is the original uploadDocument function
+// @desc    Upload document (FIXED - stores URL as string, not object)
 // @route   POST /api/users/documents
 // @access  Private
 exports.uploadDocument = async (req, res) => {
   try {
     const { documentUrl, documentType } = req.body;
+
+    if (!documentUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Document URL is required'
+      });
+    }
 
     const user = await User.findById(req.user.id);
     
@@ -305,11 +312,8 @@ exports.uploadDocument = async (req, res) => {
       user.documents = [];
     }
     
-    user.documents.push({
-      url: documentUrl,
-      type: documentType,
-      uploadedAt: new Date()
-    });
+    // Store the document URL as a string in the documents array
+    user.documents.push(documentUrl);
 
     await user.save();
 

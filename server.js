@@ -17,12 +17,25 @@ const employeeRoutes = require('./routes/employeeRoutes');
 
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ============================================
+// CORS CONFIGURATION
+// ============================================
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// MongoDB Connection
+// ============================================
+// MIDDLEWARE - WITH PAYLOAD LIMIT FIX
+// ============================================
+// Increase payload limit for large image uploads
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ============================================
+// MONGODB CONNECTION
+// ============================================
 console.log('🔌 Connecting to MongoDB...');
 console.log('📊 Environment:', process.env.NODE_ENV || 'development');
 console.log('🔑 MongoDB URI:', process.env.MONGO_URI ? '✅ URI exists' : '❌ URI missing');
@@ -48,7 +61,9 @@ mongoose.connect(process.env.MONGO_URI, mongooseOptions)
     console.log('❌ MongoDB Connection Error:', err.message);
   });
 
-// Debug route to check environment variables
+// ============================================
+// DEBUG ROUTES
+// ============================================
 app.get('/api/debug-env', (req, res) => {
   const mongoURI = process.env.MONGO_URI || 'not set';
   const maskedURI = mongoURI.replace(/:[^:]*@/, ':****@');
@@ -61,11 +76,17 @@ app.get('/api/debug-env', (req, res) => {
       apiKey: process.env.CLOUDINARY_API_KEY ? '✅ set' : '❌ not set',
       apiSecret: process.env.CLOUDINARY_API_SECRET ? '✅ set' : '❌ not set'
     },
+    emailConfig: {
+      emailUser: process.env.EMAIL_USER ? '✅ set' : '❌ not set',
+      emailPass: process.env.EMAIL_PASS ? '✅ set' : '❌ not set'
+    },
     serverTime: new Date().toISOString()
   });
 });
 
-// Test route
+// ============================================
+// TEST ROUTES
+// ============================================
 app.get('/', (req, res) => {
   res.json({ 
     message: '🚀 Job Portal API is Running!',
@@ -74,7 +95,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Test DB route
 app.get('/api/test-db', async (req, res) => {
   try {
     const dbState = mongoose.connection.readyState;
@@ -97,7 +117,6 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// Test models route
 app.get('/api/test-models', async (req, res) => {
   try {
     const models = {
@@ -117,7 +136,34 @@ app.get('/api/test-models', async (req, res) => {
   }
 });
 
-// DEBUG ROUTES - Add this to see all registered routes
+app.get('/api/test-email', async (req, res) => {
+  try {
+    const { sendApprovalEmail } = require('./utils/emailService');
+    
+    const result = await sendApprovalEmail(
+      process.env.EMAIL_USER || 'test@example.com',
+      'Test User',
+      'Test Job',
+      'testuser',
+      'testpass123'
+    );
+    
+    res.json({
+      success: result,
+      message: result ? '✅ Test email sent successfully!' : '❌ Test email failed'
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// DEBUG ROUTES - See all registered routes
+// ============================================
 app.get('/api/debug-routes', (req, res) => {
   const routes = [];
   
@@ -146,13 +192,18 @@ app.get('/api/debug-routes', (req, res) => {
   });
 });
 
-// Mount routes - ORDER MATTERS! Auth first, then others
+// ============================================
+// MOUNT ROUTES - ORDER MATTERS!
+// ============================================
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/users', userRoutes); 
 app.use('/api/employee', employeeRoutes);
 
+// ============================================
+// ERROR HANDLERS
+// ============================================
 // 404 handler
 app.use((req, res, next) => {
   res.status(404).json({ 
@@ -162,9 +213,18 @@ app.use((req, res, next) => {
   });
 });
 
-// Error handler
+// Global error handler
 app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.stack);
+  
+  // Handle specific error types
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      message: 'File too large. Please upload a smaller file (max 10MB).'
+    });
+  }
+  
   res.status(500).json({ 
     success: false,
     message: 'Something went wrong!',
@@ -172,6 +232,9 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ============================================
+// START SERVER
+// ============================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`\n🚀 ==================================`);
@@ -180,6 +243,7 @@ app.listen(PORT, () => {
   console.log(`📍 Test DB: http://localhost:${PORT}/api/test-db`);
   console.log(`📍 Debug Env: http://localhost:${PORT}/api/debug-env`);
   console.log(`📍 Debug Routes: http://localhost:${PORT}/api/debug-routes`);
+  console.log(`📍 Test Email: http://localhost:${PORT}/api/test-email`);
   console.log(`📍 Auth API: http://localhost:${PORT}/api/auth`);
   console.log(`📍 Jobs API: http://localhost:${PORT}/api/jobs`);
   console.log(`📍 Applications API: http://localhost:${PORT}/api/applications`);
