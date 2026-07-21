@@ -13,7 +13,8 @@ const {
   updatePaymentInfo,
   uploadPaymentScreenshot,
   updateInterviewStatus,
-  verifyPayment
+  verifyPayment,
+  getApplicants 
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -21,6 +22,7 @@ const { protect, authorize } = require('../middleware/authMiddleware');
 // ADMIN ROUTES
 // ============================================
 router.get('/', protect, authorize('admin'), getAllUsers);
+router.get('/applicants', protect, authorize('admin'), getApplicants);
 router.put('/:userId/id-approve', protect, authorize('admin'), approveID);
 router.put('/:userId/id-reject', protect, authorize('admin'), rejectID);
 router.put('/:userId/interview-status', protect, authorize('admin'), updateInterviewStatus);

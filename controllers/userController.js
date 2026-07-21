@@ -477,6 +477,58 @@ exports.updateInterviewStatus = async (req, res) => {
   }
 };
 
+// @desc    Get all applicants with their submissions (Admin only)
+// @route   GET /api/users/applicants
+// @access  Private/Admin
+exports.getApplicants = async (req, res) => {
+  try {
+    const applicants = await User.find({ role: 'applicant' })
+      .select('-password')
+      .sort('-createdAt');
+
+    // Format the data for easy viewing
+    const formattedApplicants = applicants.map(applicant => ({
+      _id: applicant._id,
+      name: applicant.name,
+      email: applicant.email,
+      phone: applicant.phone,
+      username: applicant.username,
+      createdAt: applicant.createdAt,
+      // ID Card
+      idPhoto: applicant.idPhoto || null,
+      idNumber: applicant.idNumber || null,
+      idStatus: applicant.idStatus || 'pending',
+      // CV & Documents
+      cv: applicant.cv || null,
+      documents: applicant.documents || [],
+      // Payment
+      paymentPhone: applicant.paymentPhone || null,
+      paymentScreenshot: applicant.paymentScreenshot || null,
+      paymentStatus: applicant.paymentStatus || 'pending',
+      // Comment
+      comment: applicant.comment || null,
+      // Interview
+      interviewStatus: applicant.interviewStatus || 'pending',
+      interviewDate: applicant.interviewDate || null,
+      interviewNotes: applicant.interviewNotes || null,
+      // Status
+      isApproved: applicant.isApproved || false,
+    }));
+
+    res.json({
+      success: true,
+      count: formattedApplicants.length,
+      data: formattedApplicants
+    });
+  } catch (error) {
+    console.error('Error fetching applicants:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
 // @desc    Verify payment (Admin only)
 // @route   PUT /api/users/:userId/verify-payment
 // @access  Private/Admin
